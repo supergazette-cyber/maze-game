@@ -1,4 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>격자 탈출</title>
+<meta name="description" content="방향키나 스와이프로 미로를 빠져나가는 간단한 게임. 난이도 3단계와 기록 저장.">
+<meta name="theme-color" content="#E9ECF1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101319" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="격자 탈출">
+
+<!-- 공유 미리보기 (카카오톡·페이스북·슬랙 등) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="격자 탈출">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:title" content="격자 탈출">
+<meta property="og:description" content="방향키로 미로를 빠져나가세요. 난이도 3단계, 설치 없이 바로 플레이.">
+<meta property="og:url" content="https://supergazette-cyber.github.io/maze-game/">
+<meta property="og:image" content="https://supergazette-cyber.github.io/maze-game/og.png">
+<meta property="og:image:secure_url" content="https://supergazette-cyber.github.io/maze-game/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="미로와 파란 커서, 주황 도착점">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="격자 탈출">
+<meta name="twitter:description" content="방향키로 미로를 빠져나가세요. 난이도 3단계, 설치 없이 바로 플레이.">
+<meta name="twitter:image" content="https://supergazette-cyber.github.io/maze-game/og.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -66,15 +97,24 @@
     font-family: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI",
       "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-tap-highlight-color: transparent;
+    /* 스와이프 조작 중 당겨서 새로고침·고무줄 스크롤이 끼어들지 않게 */
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
+  button { touch-action: manipulation; }
+
   .app {
-    height: 100%;
+    height: 100vh;
+    height: 100dvh; /* 모바일 주소창이 접힐 때 잘리지 않도록 */
     display: flex;
     flex-direction: column;
     gap: 14px;
-    padding-inline: 16px;
-    padding-block: 16px 18px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     max-width: 620px;
     margin-inline: auto;
   }
@@ -144,12 +184,12 @@
     justify-content: center;
   }
 
+  /* 실제 크기는 JS의 layout()이 가로·세로 중 작은 쪽에 맞춰 px로 지정합니다.
+     아래 값은 스크립트가 돌기 전의 초기값입니다. */
   .board {
     position: relative;
+    width: 100%;
     aspect-ratio: 1;
-    max-height: 100%;
-    max-width: 100%;
-    height: 100%;
     background: var(--floor);
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -311,11 +351,33 @@
     outline-offset: 2px;
   }
 
-  @media (max-width: 420px) {
+  /* 폰: 손가락에 맞는 터치 영역으로 키우고, 키보드 안내는 감춥니다. */
+  @media (max-width: 460px) {
     .hint { display: none; }
-    .controls { justify-content: center; }
+    .app { gap: 11px; }
+    .pad {
+      grid-template-columns: repeat(3, 58px);
+      grid-template-rows: repeat(2, 52px);
+      gap: 6px;
+    }
+    .pad button { font-size: 1.25rem; }
+    .levels button { padding: 8px 15px; font-size: .82rem; }
+    .btn { padding: 12px 18px; }
+    .stat { padding: 8px 11px; }
+    h1 { font-size: 1.3rem; }
+  }
+
+  /* 낮고 넓은 화면(가로로 눕힌 폰): 아래쪽 요소를 납작하게 */
+  @media (max-height: 460px) and (orientation: landscape) {
+    .app { gap: 8px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+    .tagline, .hint { display: none; }
+    .pad { grid-template-rows: repeat(2, 36px); grid-template-columns: repeat(3, 44px); }
+    .stat { padding: 5px 11px; }
+    .stat dd { font-size: .92rem; }
   }
 </style>
+</head>
+<body>
 
 <div class="app">
   <header>
@@ -529,6 +591,20 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  var stage = document.querySelector(".stage");
+  var board = document.querySelector(".board");
+
+  // 남은 공간의 가로·세로 중 작은 값에 맞춰 판을 정사각형으로 고정합니다.
+  // CSS의 aspect-ratio만으로는 세로가 긴 폰에서 정사각형이 유지되지 않습니다.
+  function layout() {
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    var s = Math.max(140, Math.floor(Math.min(w, h)));
+    board.style.width = s + "px";
+    board.style.height = s + "px";
+    resize();
+  }
+
   function resize() {
     var rect = canvas.getBoundingClientRect();
     if (!rect.width) return;
@@ -678,8 +754,9 @@
   document.getElementById("again").addEventListener("click", function () { newMaze(game.diff); });
 
   /* ---------- theme + size reactivity ---------- */
-  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
-  window.addEventListener("resize", resize);
+  if (window.ResizeObserver) new ResizeObserver(layout).observe(stage);
+  window.addEventListener("resize", layout);
+  window.addEventListener("orientationchange", function () { setTimeout(layout, 120); });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
   new MutationObserver(draw).observe(document.documentElement, {
     attributes: true, attributeFilter: ["data-theme"]
@@ -705,7 +782,7 @@
       }
       syncStats();
     }
-    resize();
+    layout();
   }
 
   try {
@@ -727,5 +804,12 @@
   } else {
     start((window.claude && window.claude.hot && window.claude.hot.data) || null);
   }
+
+  // 폰트가 늦게 로드되면 레이아웃이 한 번 더 바뀌므로 그때 다시 맞춥니다.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(layout).catch(function () {});
+  }
 })();
 </script>
+</body>
+</html>
