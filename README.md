@@ -1,6 +1,8 @@
 # 격자 탈출 (maze-game)
 
-방향키로 미로를 빠져나가는 단일 HTML 게임. 빌드 도구나 의존성 없이 [`maze.html`](maze.html) 파일 하나를 브라우저로 열면 바로 실행됩니다.
+방향키로 미로를 빠져나가는 단일 HTML 게임. 빌드 도구나 의존성 없이 [`index.html`](index.html) 파일 하나를 브라우저로 열면 바로 실행됩니다.
+
+**▶ 바로 플레이: https://supergazette-cyber.github.io/maze-game/**
 
 ## 플레이 방법
 
@@ -23,7 +25,7 @@
 
 ## 색상
 
-색상은 모두 `maze.html` 상단 `:root` 블록의 CSS 변수로 모여 있습니다.
+색상은 모두 `index.html` 상단 `:root` 블록의 CSS 변수로 모여 있습니다.
 
 | 토큰 | 라이트 | 다크 | 용도 |
 | --- | --- | --- | --- |
@@ -38,8 +40,10 @@
 ## 구조
 
 ```
-maze.html    게임 전체 (HTML + CSS + JS, 외부 의존성은 Google Fonts뿐)
+index.html   게임 전체 (HTML + CSS + JS, 외부 의존성은 Google Fonts뿐)
 ```
+
+GitHub Pages가 저장소 루트의 `index.html`을 그대로 서빙합니다. 별도 빌드 단계는 없습니다.
 
 ## 라이선스
 
