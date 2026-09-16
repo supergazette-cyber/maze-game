@@ -1,0 +1,731 @@
+<title>격자 탈출</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #E9ECF1;
+    --panel: #F7F8FB;
+    --line: #CBD2DE;
+    --ink: #141821;
+    --muted: #5D6779;
+    --wall: #2A3240;
+    --floor: #FFFFFF;
+    --accent: #177F73;
+    --accent-soft: rgba(23, 127, 115, .15);
+    --cursor: #10218B; /* Epson Blue, Pantone 287 */
+    --cursor-soft: rgba(16, 33, 139, .13);
+    --goal: #D97534;
+    --shadow: 0 1px 2px rgba(20, 24, 33, .06), 0 10px 28px -16px rgba(20, 24, 33, .45);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101319;
+      --panel: #171B23;
+      --line: #2A3140;
+      --ink: #E6EAF2;
+      --muted: #8D97A9;
+      --wall: #4A566B;
+      --floor: #1C212B;
+      --accent: #3FBFAE;
+      --accent-soft: rgba(63, 191, 174, .16);
+      --cursor: #7B88F0; /* Epson Blue lightened for dark grounds */
+      --cursor-soft: rgba(123, 136, 240, .17);
+      --goal: #EE9A54;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #101319;
+    --panel: #171B23;
+    --line: #2A3140;
+    --ink: #E6EAF2;
+    --muted: #8D97A9;
+    --wall: #4A566B;
+    --floor: #1C212B;
+    --accent: #3FBFAE;
+    --accent-soft: rgba(63, 191, 174, .16);
+    --cursor: #7B88F0; /* Epson Blue lightened for dark grounds */
+    --cursor-soft: rgba(123, 136, 240, .17);
+    --goal: #EE9A54;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  [hidden] { display: none !important; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-inline: 16px;
+    padding-block: 16px 18px;
+    max-width: 620px;
+    margin-inline: auto;
+  }
+
+  /* ---- header ---- */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-family: Archivo, "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 1.45rem;
+    letter-spacing: -.02em;
+    margin: 0;
+  }
+
+  .tagline {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .72rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ---- difficulty ---- */
+  .levels {
+    display: flex;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px;
+  }
+
+  .levels button {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .78rem;
+    font-weight: 500;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 13px;
+    cursor: pointer;
+    transition: color .15s, background-color .15s;
+  }
+
+  .levels button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--floor);
+  }
+
+  :root[data-theme="dark"] .levels button[aria-pressed="true"],
+  .levels button[aria-pressed="true"] { color: #FFF; }
+
+  /* ---- maze ---- */
+  .stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .board {
+    position: relative;
+    aspect-ratio: 1;
+    max-height: 100%;
+    max-width: 100%;
+    height: 100%;
+    background: var(--floor);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+
+  .win {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: color-mix(in srgb, var(--floor) 88%, transparent);
+    backdrop-filter: blur(3px);
+    animation: fade .25s ease-out;
+  }
+
+  @keyframes fade { from { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .win { animation: none; }
+  }
+
+  .win h2 {
+    font-family: Archivo, sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: -.02em;
+    margin: 0;
+  }
+
+  .win p {
+    margin: 0;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .85rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .win .record { color: var(--goal); font-weight: 600; }
+
+  .btn {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .82rem;
+    font-weight: 500;
+    color: #FFF;
+    background: var(--accent);
+    border: 0;
+    border-radius: 5px;
+    padding: 10px 20px;
+    margin-top: 4px;
+    cursor: pointer;
+  }
+
+  .btn.ghost {
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+
+  /* ---- stats ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .stat {
+    padding: 9px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat + .stat { border-left: 1px solid var(--line); }
+
+  .stat dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .64rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .stat dd {
+    margin: 0;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 1.02rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- controls ---- */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 42px);
+    grid-template-rows: repeat(2, 42px);
+    gap: 5px;
+  }
+
+  .pad button {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--ink);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+
+  .pad button:active { background: var(--accent-soft); }
+
+  .pad .up { grid-column: 2; grid-row: 1; }
+  .pad .left { grid-column: 1; grid-row: 2; }
+  .pad .down { grid-column: 2; grid-row: 2; }
+  .pad .right { grid-column: 3; grid-row: 2; }
+
+  .hint {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem;
+    line-height: 1.7;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .hint kbd {
+    font: inherit;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 4px;
+    background: var(--panel);
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--goal);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 420px) {
+    .hint { display: none; }
+    .controls { justify-content: center; }
+  }
+</style>
+
+<div class="app">
+  <header>
+    <div>
+      <h1>격자 탈출</h1>
+      <div class="tagline">좌상단 출발 → 우하단 도착</div>
+    </div>
+    <div class="levels" role="group" aria-label="난이도">
+      <button type="button" id="lv-easy" data-size="11" aria-pressed="true">쉬움</button>
+      <button type="button" id="lv-normal" data-size="17" aria-pressed="false">보통</button>
+      <button type="button" id="lv-hard" data-size="25" aria-pressed="false">어려움</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="board">
+      <canvas id="maze" aria-label="미로. 방향키로 이동하세요."></canvas>
+      <div class="win" id="win" hidden>
+        <h2 id="win-title">탈출 성공</h2>
+        <p id="win-detail">—</p>
+        <p class="record" id="win-record" hidden>새 최고 기록</p>
+        <button type="button" class="btn" id="again">다음 미로</button>
+      </div>
+    </div>
+  </div>
+
+  <dl class="stats">
+    <div class="stat"><dt>시간</dt><dd id="s-time">0.0초</dd></div>
+    <div class="stat"><dt>이동</dt><dd id="s-moves">0</dd></div>
+    <div class="stat"><dt>최고 기록</dt><dd id="s-best">—</dd></div>
+  </dl>
+
+  <div class="controls">
+    <div class="pad">
+      <button type="button" class="up" data-dir="0" aria-label="위로">↑</button>
+      <button type="button" class="left" data-dir="3" aria-label="왼쪽으로">←</button>
+      <button type="button" class="down" data-dir="2" aria-label="아래로">↓</button>
+      <button type="button" class="right" data-dir="1" aria-label="오른쪽으로">→</button>
+    </div>
+    <div class="hint">
+      <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>
+      화면을 밀어서 이동 · <kbd>R</kbd> 새 미로
+    </div>
+    <button type="button" class="btn ghost" id="new">새 미로</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var N = 1, E = 2, S = 4, W = 8;
+  var BIT = [N, E, S, W];
+  var DX = [0, 1, 0, -1];
+  var DY = [-1, 0, 1, 0];
+  var SIZES = { easy: 11, normal: 17, hard: 25 };
+  var LABEL = { easy: "쉬움", normal: "보통", hard: "어려움" };
+
+  var canvas = document.getElementById("maze");
+  var ctx = canvas.getContext("2d");
+  var winBox = document.getElementById("win");
+  var winDetail = document.getElementById("win-detail");
+  var winRecord = document.getElementById("win-record");
+  var elTime = document.getElementById("s-time");
+  var elMoves = document.getElementById("s-moves");
+  var elBest = document.getElementById("s-best");
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var game = {
+    diff: "easy",
+    n: SIZES.easy,
+    cells: null,
+    seen: null,
+    cx: 0, cy: 0,
+    moves: 0,
+    startedAt: 0,
+    elapsed: 0,
+    running: false,
+    won: false
+  };
+
+  // animated position + blocked-nudge, purely visual
+  var view = { x: 0, y: 0, tx: 0, ty: 0, t: 1, nx: 0, ny: 0 };
+  var raf = 0;
+
+  /* ---------- storage ---------- */
+  function bestKey(diff) { return "gyeokja-best-" + diff; }
+
+  function readBest(diff) {
+    try {
+      var v = parseFloat(localStorage.getItem(bestKey(diff)));
+      return isFinite(v) && v > 0 ? v : null;
+    } catch (e) { return null; }
+  }
+
+  function writeBest(diff, ms) {
+    try { localStorage.setItem(bestKey(diff), String(ms)); } catch (e) {}
+  }
+
+  /* ---------- maze generation (iterative backtracker) ---------- */
+  function carve(n) {
+    var cells = new Uint8Array(n * n).fill(15);
+    var visited = new Uint8Array(n * n);
+    var stack = [0];
+    visited[0] = 1;
+
+    while (stack.length) {
+      var cur = stack[stack.length - 1];
+      var cx = cur % n, cy = (cur - cx) / n;
+      var open = [];
+      for (var d = 0; d < 4; d++) {
+        var nx = cx + DX[d], ny = cy + DY[d];
+        if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        if (!visited[ny * n + nx]) open.push(d);
+      }
+      if (!open.length) { stack.pop(); continue; }
+      var dir = open[(Math.random() * open.length) | 0];
+      var tx = cx + DX[dir], ty = cy + DY[dir], next = ty * n + tx;
+      cells[cur] &= ~BIT[dir];
+      cells[next] &= ~BIT[(dir + 2) % 4];
+      visited[next] = 1;
+      stack.push(next);
+    }
+    return cells;
+  }
+
+  function newMaze(diff) {
+    game.diff = diff;
+    game.n = SIZES[diff];
+    game.cells = carve(game.n);
+    game.seen = new Uint8Array(game.n * game.n);
+    game.seen[0] = 1;
+    game.cx = 0; game.cy = 0;
+    game.moves = 0;
+    game.elapsed = 0;
+    game.startedAt = 0;
+    game.running = false;
+    game.won = false;
+    view.x = view.tx = 0; view.y = view.ty = 0; view.t = 1;
+    view.nx = view.ny = 0;
+    winBox.hidden = true;
+    syncStats();
+    draw();
+  }
+
+  /* ---------- movement ---------- */
+  function step(dir) {
+    if (game.won) return;
+    var i = game.cy * game.n + game.cx;
+    if (game.cells[i] & BIT[dir]) {
+      view.nx = DX[dir] * 0.14;
+      view.ny = DY[dir] * 0.14;
+      animate();
+      return;
+    }
+    if (!game.running) {
+      game.running = true;
+      game.startedAt = performance.now();
+      tick();
+    }
+    game.cx += DX[dir];
+    game.cy += DY[dir];
+    game.moves++;
+    game.seen[game.cy * game.n + game.cx] = 1;
+    view.tx = game.cx; view.ty = game.cy;
+    view.t = reduceMotion ? 1 : 0;
+    if (reduceMotion) { view.x = view.tx; view.y = view.ty; }
+    animate();
+    syncStats();
+    if (game.cx === game.n - 1 && game.cy === game.n - 1) finish();
+  }
+
+  function finish() {
+    game.won = true;
+    game.running = false;
+    game.elapsed = performance.now() - game.startedAt;
+    var prev = readBest(game.diff);
+    var record = prev === null || game.elapsed < prev;
+    if (record) writeBest(game.diff, game.elapsed);
+    winDetail.textContent =
+      LABEL[game.diff] + " · " + fmt(game.elapsed) + " · " + game.moves + "칸 이동";
+    winRecord.hidden = !record;
+    winBox.hidden = false;
+    document.getElementById("again").focus();
+    syncStats();
+  }
+
+  /* ---------- clock + stats ---------- */
+  function fmt(ms) {
+    var s = ms / 1000;
+    if (s < 60) return s.toFixed(1) + "초";
+    var m = Math.floor(s / 60);
+    return m + "분 " + (s - m * 60).toFixed(1) + "초";
+  }
+
+  function tick() {
+    if (!game.running) return;
+    elTime.textContent = fmt(performance.now() - game.startedAt);
+    setTimeout(tick, 100);
+  }
+
+  function syncStats() {
+    elTime.textContent = fmt(game.running ? performance.now() - game.startedAt : game.elapsed);
+    elMoves.textContent = String(game.moves);
+    var b = readBest(game.diff);
+    elBest.textContent = b === null ? "—" : fmt(b);
+  }
+
+  /* ---------- rendering ---------- */
+  function token(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function resize() {
+    var rect = canvas.getBoundingClientRect();
+    if (!rect.width) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    draw();
+  }
+
+  function draw() {
+    if (!game.cells || !canvas.width) return;
+    var n = game.n;
+    var w = canvas.width, h = canvas.height;
+    var pad = Math.max(6, w * 0.022);
+    var size = Math.min(w, h) - pad * 2;
+    var c = size / n;
+
+    var colFloor = token("--floor");
+    var colWall = token("--wall");
+    var colCursor = token("--cursor");
+    var colSoft = token("--cursor-soft");
+    var colGoal = token("--goal");
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = colFloor;
+    ctx.fillRect(0, 0, w, h);
+    ctx.translate((w - size) / 2, (h - size) / 2);
+
+    // trail of visited cells
+    ctx.fillStyle = colSoft;
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        if (game.seen[y * n + x]) ctx.fillRect(x * c, y * c, c, c);
+      }
+    }
+
+    // goal marker
+    var gx = (n - 1) * c, gy = (n - 1) * c;
+    ctx.fillStyle = colGoal;
+    ctx.globalAlpha = 0.22;
+    ctx.fillRect(gx, gy, c, c);
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(gx + c / 2, gy + c / 2, c * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // walls
+    ctx.strokeStyle = colWall;
+    ctx.lineWidth = Math.max(1.5, c * 0.14);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (var cy = 0; cy < n; cy++) {
+      for (var cx = 0; cx < n; cx++) {
+        var v = game.cells[cy * n + cx];
+        var px = cx * c, py = cy * c;
+        if (v & N) { ctx.moveTo(px, py); ctx.lineTo(px + c, py); }
+        if (v & W) { ctx.moveTo(px, py); ctx.lineTo(px, py + c); }
+        if (cy === n - 1 && (v & S)) { ctx.moveTo(px, py + c); ctx.lineTo(px + c, py + c); }
+        if (cx === n - 1 && (v & E)) { ctx.moveTo(px + c, py); ctx.lineTo(px + c, py + c); }
+      }
+    }
+    ctx.stroke();
+
+    // player
+    var ease = view.t * view.t * (3 - 2 * view.t);
+    var ax = view.x + (view.tx - view.x) * ease + view.nx;
+    var ay = view.y + (view.ty - view.y) * ease + view.ny;
+    var r = c * 0.26;
+    ctx.fillStyle = colCursor;
+    ctx.beginPath();
+    ctx.arc((ax + 0.5) * c, (ay + 0.5) * c, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.28;
+    ctx.beginPath();
+    ctx.arc((ax + 0.5) * c, (ay + 0.5) * c, r * 1.75, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function animate() {
+    if (raf) return;
+    var last = performance.now();
+    raf = requestAnimationFrame(function loop(now) {
+      var dt = (now - last) / 1000;
+      last = now;
+      var busy = false;
+      if (view.t < 1) {
+        view.t = Math.min(1, view.t + dt / 0.11);
+        busy = true;
+        if (view.t === 1) { view.x = view.tx; view.y = view.ty; }
+      }
+      if (view.nx || view.ny) {
+        var decay = Math.max(0, 1 - dt / 0.12);
+        view.nx *= decay; view.ny *= decay;
+        if (Math.abs(view.nx) < 0.004 && Math.abs(view.ny) < 0.004) { view.nx = 0; view.ny = 0; }
+        else busy = true;
+      }
+      draw();
+      raf = busy ? requestAnimationFrame(loop) : 0;
+    });
+  }
+
+  /* ---------- input ---------- */
+  var KEYS = {
+    ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3,
+    w: 0, d: 1, s: 2, a: 3, W: 0, D: 1, S: 2, A: 3
+  };
+
+  window.addEventListener("keydown", function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "r" || e.key === "R") { newMaze(game.diff); return; }
+    var dir = KEYS[e.key];
+    if (dir === undefined) return;
+    e.preventDefault();
+    step(dir);
+  });
+
+  var swipe = null;
+  canvas.addEventListener("pointerdown", function (e) {
+    swipe = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener("pointerup", function (e) {
+    if (!swipe) return;
+    var dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    if (Math.abs(dx) > Math.abs(dy)) step(dx > 0 ? 1 : 3);
+    else step(dy > 0 ? 2 : 0);
+  });
+  canvas.addEventListener("pointercancel", function () { swipe = null; });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".pad button"), function (b) {
+    b.addEventListener("click", function () { step(Number(b.dataset.dir)); });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".levels button"), function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".levels button"), function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      var key = b.id.slice(3);
+      newMaze(key);
+    });
+  });
+
+  document.getElementById("new").addEventListener("click", function () { newMaze(game.diff); });
+  document.getElementById("again").addEventListener("click", function () { newMaze(game.diff); });
+
+  /* ---------- theme + size reactivity ---------- */
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+  window.addEventListener("resize", resize);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  new MutationObserver(draw).observe(document.documentElement, {
+    attributes: true, attributeFilter: ["data-theme"]
+  });
+
+  /* ---------- boot (state survives a republish) ---------- */
+  function start(saved) {
+    var diff = saved && SIZES[saved.diff] ? saved.diff : "easy";
+    newMaze(diff);
+    Array.prototype.forEach.call(document.querySelectorAll(".levels button"), function (o) {
+      o.setAttribute("aria-pressed", String(o.id === "lv-" + diff));
+    });
+    if (saved && saved.cells && saved.cells.length === game.n * game.n) {
+      game.cells = Uint8Array.from(saved.cells);
+      game.seen = Uint8Array.from(saved.seen);
+      game.cx = saved.cx; game.cy = saved.cy;
+      game.moves = saved.moves;
+      view.x = view.tx = game.cx; view.y = view.ty = game.cy;
+      if (saved.elapsed && !saved.won) {
+        game.running = true;
+        game.startedAt = performance.now() - saved.elapsed;
+        tick();
+      }
+      syncStats();
+    }
+    resize();
+  }
+
+  try {
+    window.claude && window.claude.hot && window.claude.hot.snapshot(function () {
+      return {
+        diff: game.diff,
+        cells: Array.from(game.cells),
+        seen: Array.from(game.seen),
+        cx: game.cx, cy: game.cy,
+        moves: game.moves,
+        won: game.won,
+        elapsed: game.running ? performance.now() - game.startedAt : game.elapsed
+      };
+    });
+  } catch (e) {}
+
+  if (window.claude && window.claude.hot && window.claude.hot.ready) {
+    window.claude.hot.ready(start);
+  } else {
+    start((window.claude && window.claude.hot && window.claude.hot.data) || null);
+  }
+})();
+</script>
